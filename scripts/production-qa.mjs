@@ -72,7 +72,22 @@ for (const route of [...caseRoutes, '/404', '/not-a-real-page']) {
     await page.close();
   }
 }
-notes.push('Case studies, 404, and direct refresh checks passed');
+notes.push('Demo details, 404, and direct refresh checks passed');
+
+// Admin routes must remain protected and responsive even before Firebase is configured.
+for (const width of [320, 375, 390, 414, 768, 1024, 1280]) {
+  const { page, errors } = await openPage('/admin', { width, height: width < 500 ? 844 : 960 });
+  await page.waitForURL('**/admin/login');
+  const result = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    heading: document.querySelector('h1')?.textContent.trim(),
+  }));
+  check(result.overflow <= 1, `${width}px admin login: horizontal overflow ${result.overflow}`);
+  check(result.heading === 'Sign in to Katch.', `${width}px admin login: protected redirect failed`);
+  check(errors.length === 0, `${width}px admin login: ${errors.join(' | ')}`);
+  await page.close();
+}
+notes.push('Admin route protection and responsive login passed');
 
 // Mobile menu at every meaningful scroll position and on short screens.
 for (const [width, height] of [[320, 568], [360, 640], [375, 667], [390, 844], [414, 896], [812, 375]]) {
@@ -183,28 +198,34 @@ notes.push('Mobile menu outside click, focus, Escape, repeat, and navigation pas
 }
 notes.push('Scroll restoration and browser history passed');
 
-// Contact form validation, exact budget option, successful submission UI.
+// Contact form validation, removed budget field, current website, and successful submission UI.
 {
   const { page, errors } = await openPage('/contact', { width: 390, height: 844 });
+  check((await page.locator('#budget').count()) === 0, 'Budget field still exists');
   await page.locator('.submit-button').click();
   check((await page.locator('.form-field--error').count()) === 5, 'Required form validation did not show five errors');
   await page.locator('#name').fill('Alex Morgan');
   await page.locator('#email').fill('alex@example.com');
   await page.locator('#company').fill('North Studio');
   await page.locator('#projectType').selectOption({ label: 'Business Website' });
-  await page.locator('#budget').selectOption({ label: '$700 – $1,000' });
-  await page.locator('#details').fill('We need a focused business website that explains our services and generates qualified enquiries.');
-  check((await page.locator('#budget').inputValue()) === '$700 – $1,000', 'Budget value did not remain selected');
-  const selectRect = await page.locator('#budget').evaluate((element) => element.getBoundingClientRect().toJSON());
-  check(selectRect.left >= 0 && selectRect.right <= 390, 'Budget select overflowed mobile viewport');
-  await page.route('**/api/contact', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' }));
+  await page.locator('#currentWebsite').fill('northstudio.example.com');
+  await page.locator('#projectDetails').fill('We need a focused business website that explains our services and generates qualified enquiries.');
+  let submittedPayload;
+  await page.route('**/api/contact', async (route) => {
+    submittedPayload = route.request().postDataJSON();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+  });
   await page.locator('.submit-button').click();
+  check(await page.locator('.submit-button').isDisabled(), 'Submit button was not disabled while submitting');
   await page.locator('.form-success').waitFor();
+  check(!Object.hasOwn(submittedPayload || {}, 'budget'), 'Budget was still included in the submission payload');
+  check(submittedPayload?.currentWebsite === 'https://northstudio.example.com', 'Current website was not normalized in the payload');
   check(await page.locator('.form-success').isVisible(), 'Successful form state did not render');
   check(errors.length === 0, `Contact form errors: ${errors.join(' | ')}`);
   await page.close();
 }
-notes.push('Contact validation, budget, mobile select, and success state passed');
+notes.push('Contact validation, website URL, duplicate prevention, and success state passed');
 
 await browser.close();
 console.log(notes.join('\n'));

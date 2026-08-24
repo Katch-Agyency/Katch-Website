@@ -3508,3 +3508,10 @@ ol {
     font-size: 0.72rem;
   }
 }
+
+.field-optional {
+  margin-left: 0.45rem;
+  color: var(--muted);
+  font-size: 0.9em;
+  font-weight: 400;
+}

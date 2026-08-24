@@ -1,47 +1,65 @@
-# Katch — Production Agency Website
+# Katch — Production Website + Secure Admin
 
-A launch-ready React/Vite website for Katch, built to generate qualified project enquiries and present Katch as a premium web design and development agency.
+A production React/Vite website for Katch with a real Firebase-backed project inquiry flow and protected lead-management admin area.
 
 ## Architecture
 
-- React + Vite static frontend
-- React Router multi-page client experience
-- Data-driven projects and services
-- Optimized local WebP assets and self-hosted fonts
-- Optional Vercel Function for contact delivery through Resend
-- No database or unnecessary backend infrastructure
+```text
+Public website
+  → POST /api/contact (validated Vercel Function)
+  → Cloud Firestore projects collection
+  → optional Resend notification
+
+Admin
+  → Firebase Authentication
+  → admin custom claim check
+  → Firestore real-time listeners
+  → Firestore Security Rules enforce admin-only reads/updates
+```
+
+The public browser never receives service-account credentials and cannot read or write the `projects` collection directly. The submission endpoint uses server-only credentials. Firebase client configuration is loaded only with the lazy admin bundle.
 
 ## Routes
 
-- `/` — conversion-focused homepage
-- `/demos` — complete live demo gallery
+### Public
+
+- `/`
+- `/demos`
 - `/demos/smash-burger`
 - `/demos/bta3-7awa4y`
 - `/demos/raw`
 - `/demos/refined-artistry`
-- `/services` — complete service directory
-- `/process` — detailed four-stage process
-- `/about` — positioning, beliefs, and technology approach
-- `/contact` — lead-generation form
-- Unmatched client routes — branded 404 page
+- `/services`
+- `/process`
+- `/about`
+- `/contact`
 
-Production rewrites are configured in `vercel.json`; `public/_redirects` provides the equivalent SPA fallback for compatible static hosts.
+### Protected admin
 
-## Included
+- `/admin/login`
+- `/admin`
+- `/admin/projects`
+- `/admin/projects/:projectId`
 
-- Mobile-first responsive layouts from 320px through 1920px
-- Portal-based mobile navigation that is independent of header stacking contexts
-- Body scroll locking and exact scroll restoration when menus close
-- Escape, outside-click, navigation-link, and repeated-open handling
-- Keyboard focus trapping and clear active navigation states
-- Editorial demo grid using captures of the four live Katch demos
-- Dedicated, refresh-safe demo-detail routes
-- Structured services, process, about, contact, and 404 pages
-- Validated project request form with honeypot protection
-- Vercel/Resend contact endpoint with size validation, origin allowlist, and rate limiting
-- Route-specific titles, descriptions, canonical URLs, Open Graph metadata, and robots directives
-- Structured data, sitemap, robots.txt, favicon, Apple touch icon, and web manifest
-- Reduced-motion support, semantic markup, visible focus states, and responsive touch targets
+Admin routes are omitted from public navigation, marked `noindex`, and protected by Firebase Authentication plus an `admin: true` custom claim. Firestore rules independently enforce authorization.
+
+## Project inquiry model
+
+```text
+projects/{submissionId}
+  name
+  email
+  company
+  projectType
+  projectDetails
+  currentWebsite
+  status            // New by default
+  createdAt
+  updatedAt
+  notes             // admin-only internal notes
+```
+
+No budget value is collected or stored. Submission IDs provide idempotency so network retries do not create duplicate leads.
 
 ## Run locally
 
@@ -50,87 +68,171 @@ npm install
 npm run dev
 ```
 
-## Production build
+Without Firebase environment variables, the public site still renders and `/admin` safely redirects to a configuration-aware login screen. Real submissions require Firebase server configuration.
+
+## Firebase production setup
+
+1. Create a Firebase project.
+2. Create a Firebase Web App and copy its web configuration.
+3. Enable **Authentication → Email/Password**.
+4. Create a **Cloud Firestore** database.
+5. Install/login to the Firebase CLI and deploy the included rules:
 
 ```bash
-npm run audit:production
-npm run preview
+npx firebase-tools login
+npx firebase-tools use YOUR_PROJECT_ID
+npx firebase-tools deploy --only firestore:rules,firestore:indexes
 ```
 
-`audit:production` runs ESLint and creates the optimized Vite build.
+6. In Firebase Authentication, create the real admin user.
+7. Copy that user's UID.
+8. Load the server service-account environment variables locally, then grant the custom claim:
 
-## Automated production QA
+```bash
+npm run admin:grant -- FIREBASE_AUTH_UID
+```
 
-With the local site running on port 5173:
+The script requires `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`. It stores no password and revokes existing sessions so the admin signs in again with the new claim.
+
+## Environment variables
+
+Copy `.env.example` to `.env.local` for local configuration. In Vercel, add the same values through project settings.
+
+### Firebase web configuration
+
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+These are Firebase public app identifiers, not administrator credentials. Firestore Rules provide authorization.
+
+### Server-only Firebase service account
+
+```env
+FIREBASE_PROJECT_ID=...
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Never prefix these values with `VITE_`, expose them to client code, or commit them.
+
+### Submission controls
+
+```env
+VITE_CONTACT_ENDPOINT=/api/contact
+ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+PUBLIC_SITE_URL=https://your-domain.com
+```
+
+### Optional Resend notification
+
+```env
+RESEND_API_KEY=re_...
+KATCH_CONTACT_EMAIL=projects@your-domain.com
+RESEND_FROM_EMAIL=Katch Website <website@your-verified-domain.com>
+```
+
+Firestore storage succeeds independently of optional notification delivery.
+
+## Admin capabilities
+
+- Real-time recent inquiries
+- Total, New, In Discussion, and Won counts
+- Latest 100 project requests with an efficient real-time query
+- Search by name, company, or email
+- Filter by status and project type
+- Newest/oldest sorting
+- Responsive desktop table and mobile cards
+- Detailed client/project view
+- Immediate status updates
+- Private internal notes
+- Copy email, mail client, and open website actions
+- Archive status with confirmation
+- Loading, empty, error, unauthorized, and configuration states
+
+## Security model
+
+`firestore.rules` enforces:
+
+- No public reads
+- No direct public creates
+- Admin custom claim required for reads
+- Admin custom claim required for updates
+- Updates restricted to `status`, `notes`, and `updatedAt`
+- Valid status allowlist
+- Notes maximum length
+- No document deletion
+
+The public submission function separately validates field types, lengths, email, project type, URL, origin, request size, honeypot, rate limit, and idempotency key before using server credentials to store the inquiry.
+
+## Automated QA
+
+### Public website and protected-login QA
+
+Start the development server, then run:
 
 ```bash
 npm run qa
 ```
 
-To test another server:
+This covers public routes at 320–1920px, demo routes, refresh behavior, mobile navigation, overflow, history, form validation, removed budget field, current website normalization, disabled submission state, and protected admin redirects.
+
+### Full Firebase integration QA
 
 ```bash
-QA_BASE_URL=https://your-preview-domain.com npm run qa
+npm run qa:admin
 ```
 
-The QA matrix covers every primary route at 320, 360, 375, 390, 414, 768, 820, 1024, 1280, 1440, and 1920 pixels; all demo-detail routes; direct refresh; 404 behavior; horizontal overflow; broken images; console errors; mobile menu behavior at four scroll positions; body scroll restoration; focus trapping; Escape/outside click; browser history; exact budget selection; form validation; and success UI.
+This launches Firebase Auth and Firestore emulators and verifies the complete flow:
 
-## Make the contact form live
+```text
+validated submission
+→ Firestore storage
+→ real-time dashboard
+→ project details
+→ persisted status update
+→ persisted private notes
+→ responsive mobile cards
+→ logout and route protection
+```
 
-The frontend posts to `/api/contact` by default. `api/contact.js` is a deployable Vercel Function that sends project requests through Resend.
+No production Firebase data is touched.
 
-1. Create and verify a sending domain in Resend.
-2. Copy `.env.example` to `.env.local` for local use, or configure the variables in the Vercel project settings.
-3. Set:
-   - `RESEND_API_KEY`
-   - `KATCH_CONTACT_EMAIL` — the real inbox that should receive enquiries
-   - `RESEND_FROM_EMAIL` — an address on the verified sending domain
-   - `ALLOWED_ORIGINS` — the final production URL(s), comma-separated
-4. Deploy and submit a real end-to-end test request.
+## Production checks
 
-Never commit `.env.local` or production credentials. To use another provider, set `VITE_CONTACT_ENDPOINT` to a production endpoint that accepts the same JSON payload.
+```bash
+npm run audit:production
+npm audit --omit=dev
+```
 
-## Before connecting the final domain
-
-The SEO files currently use `https://katch.agency/`. If the final domain is different, replace it in:
-
-- `index.html`
-- `src/components/PageMeta.jsx`
-- `public/robots.txt`
-- `public/sitemap.xml`
-
-Then update `ALLOWED_ORIGINS` and run a fresh production build.
+The public and admin applications are route-split. Firebase Auth and Firestore are downloaded only when an admin route is opened.
 
 ## Vercel deployment
 
-1. Import this folder as a new Vercel project.
-2. Framework preset: **Vite**.
+1. Import the repository.
+2. Framework: **Vite**.
 3. Build command: `npm run build`.
 4. Output directory: `dist`.
-5. Add the contact environment variables.
-6. Deploy, connect the real domain, refresh every route directly, and submit a live form test.
+5. Configure all production Firebase and origin variables.
+6. Deploy Firestore rules.
+7. Create and claim the real admin user.
+8. Deploy the site.
+9. Submit a real project request.
+10. Verify it appears in `/admin` and persists after status/note updates.
 
-`vercel.json` contains route rewrites, immutable asset caching, and baseline security headers.
+`vercel.json` contains public/admin SPA rewrites, admin noindex headers, asset caching, and baseline security headers.
 
 ## Updating content
 
-- Demo content and detail narratives: `src/data/projects.js`
-- Services and process: `src/data/services.js`
-- Route pages: `src/pages/`
-- Shared components: `src/components/`
-
-To recapture and optimize project homepages:
-
-```bash
-npx playwright install chromium
-npx playwright install-deps chromium
-node scripts/capture-projects.mjs
-python3 scripts/optimize-project-images.py
-```
-
-To regenerate brand assets after replacing the supplied source artwork:
-
-```bash
-python3 scripts/prepare-logo.py
-node scripts/generate-brand-assets.mjs
-```
+- Demo data: `src/data/projects.js`
+- Services/process: `src/data/services.js`
+- Public pages: `src/pages/`
+- Admin: `src/admin/`
+- Submission boundary: `api/contact.js`
+- Firestore server integration: `server/firebaseAdmin.js`
+- Security rules: `firestore.rules`

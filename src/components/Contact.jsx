@@ -1,24 +1,64 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 import { ButtonLink } from './Button';
+
+const projectTypes = [
+  'Business Website',
+  'Landing Page',
+  'E-commerce',
+  'Restaurant Website',
+  'Portfolio',
+  'SaaS Website',
+  'Website Redesign',
+  'AI Integration',
+  'Automation',
+  'Other',
+];
 
 const initialForm = {
   name: '',
   email: '',
   company: '',
   projectType: '',
-  budget: '',
-  details: '',
-  website: '',
+  projectDetails: '',
+  currentWebsite: '',
+  faxNumber: '',
 };
+
+function createSubmissionId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeWebsite(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function isValidWebsite(value) {
+  if (!value.trim()) return true;
+  try {
+    const url = new URL(normalizeWebsite(value));
+    return ['http:', 'https:'].includes(url.protocol) && url.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
 
 function validate(values) {
   const errors = {};
-  if (values.name.trim().length < 2) errors.name = 'Please enter your name.';
-  if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = 'Please enter a valid email address.';
-  if (!values.projectType) errors.projectType = 'Please choose a project type.';
-  if (!values.budget) errors.budget = 'Please choose a budget range.';
-  if (values.details.trim().length < 20) errors.details = 'Tell us a little more—at least 20 characters.';
+  const name = values.name.trim();
+  const email = values.email.trim();
+  const company = values.company.trim();
+  const details = values.projectDetails.trim();
+
+  if (name.length < 2 || name.length > 100) errors.name = 'Please enter your name.';
+  if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) errors.email = 'Please enter a valid email address.';
+  if (company.length < 2 || company.length > 160) errors.company = 'Please enter your business or company name.';
+  if (!projectTypes.includes(values.projectType)) errors.projectType = 'Please choose a project type.';
+  if (details.length < 20) errors.projectDetails = 'Tell us a little more—at least 20 characters.';
+  if (details.length > 5000) errors.projectDetails = 'Project details must be 5,000 characters or fewer.';
+  if (!isValidWebsite(values.currentWebsite)) errors.currentWebsite = 'Enter a valid website address, such as example.com.';
   return errors;
 }
 
@@ -45,6 +85,7 @@ export function ContactForm() {
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState('idle');
   const [serverMessage, setServerMessage] = useState('');
+  const submissionIdRef = useRef(createSubmissionId());
 
   const update = (event) => {
     const { name, value } = event.target;
@@ -54,6 +95,8 @@ export function ContactForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (status === 'submitting') return;
+
     const nextErrors = validate(form);
     setErrors(nextErrors);
     setServerMessage('');
@@ -67,18 +110,29 @@ export function ContactForm() {
     setStatus('submitting');
     try {
       const endpoint = import.meta.env.VITE_CONTACT_ENDPOINT || '/api/contact';
+      const payload = {
+        submissionId: submissionIdRef.current,
+        name: form.name.trim(),
+        email: form.email.trim(),
+        company: form.company.trim(),
+        projectType: form.projectType,
+        projectDetails: form.projectDetails.trim(),
+        currentWebsite: normalizeWebsite(form.currentWebsite),
+        faxNumber: form.faxNumber,
+      };
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ ...form, submittedAt: new Date().toISOString() }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || 'We could not send your request. Please try again.');
+      if (!response.ok) throw new Error(data.message || 'submission_failed');
       setStatus('success');
       setForm(initialForm);
-    } catch (error) {
+      submissionIdRef.current = createSubmissionId();
+    } catch {
       setStatus('error');
-      setServerMessage(error.message || 'We could not send your request. Please try again in a moment.');
+      setServerMessage('We couldn’t send your request right now. Please try again in a moment.');
     }
   };
 
@@ -106,8 +160,8 @@ export function ContactForm() {
             <div className="form-success" role="status">
               <CheckCircle2 aria-hidden="true" />
               <p className="eyebrow">Request received</p>
-              <h2>Thanks. Your project is on our radar.</h2>
-              <p>We&apos;ll review the details and follow up using the email you provided.</p>
+              <h2>Project request received. We&apos;ll get back to you soon.</h2>
+              <p>Your details have been sent securely to Katch.</p>
               <button type="button" onClick={() => setStatus('idle')}>
                 Send another request <ArrowDownRight aria-hidden="true" />
               </button>
@@ -117,61 +171,43 @@ export function ContactForm() {
               <div className="form-grid">
                 <div className={fieldClass('name')}>
                   <label htmlFor="name">Name <span aria-hidden="true">*</span></label>
-                  <input id="name" name="name" value={form.name} onChange={update} autoComplete="name" placeholder="Your name" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} />
+                  <input id="name" name="name" value={form.name} onChange={update} autoComplete="name" maxLength="100" placeholder="Your name" aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'name-error' : undefined} required />
                   {errors.name && <small id="name-error">{errors.name}</small>}
                 </div>
                 <div className={fieldClass('email')}>
                   <label htmlFor="email">Email <span aria-hidden="true">*</span></label>
-                  <input id="email" name="email" type="email" value={form.email} onChange={update} autoComplete="email" inputMode="email" placeholder="you@company.com" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'email-error' : undefined} />
+                  <input id="email" name="email" type="email" value={form.email} onChange={update} autoComplete="email" inputMode="email" maxLength="254" placeholder="you@company.com" aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'email-error' : undefined} required />
                   {errors.email && <small id="email-error">{errors.email}</small>}
                 </div>
                 <div className={fieldClass('company')}>
-                  <label htmlFor="company">Business / Company</label>
-                  <input id="company" name="company" value={form.company} onChange={update} autoComplete="organization" placeholder="Company name" />
+                  <label htmlFor="company">Business / Company <span aria-hidden="true">*</span></label>
+                  <input id="company" name="company" value={form.company} onChange={update} autoComplete="organization" maxLength="160" placeholder="Company name" aria-invalid={Boolean(errors.company)} aria-describedby={errors.company ? 'company-error' : undefined} required />
+                  {errors.company && <small id="company-error">{errors.company}</small>}
                 </div>
                 <div className={fieldClass('projectType')}>
                   <label htmlFor="projectType">Project Type <span aria-hidden="true">*</span></label>
                   <div className="select-wrap">
-                    <select id="projectType" name="projectType" value={form.projectType} onChange={update} aria-invalid={Boolean(errors.projectType)} aria-describedby={errors.projectType ? 'project-type-error' : undefined}>
+                    <select id="projectType" name="projectType" value={form.projectType} onChange={update} aria-invalid={Boolean(errors.projectType)} aria-describedby={errors.projectType ? 'project-type-error' : undefined} required>
                       <option value="">Select a project</option>
-                      <option>Business Website</option>
-                      <option>Landing Page</option>
-                      <option>E-commerce Website</option>
-                      <option>Restaurant Website</option>
-                      <option>Portfolio Website</option>
-                      <option>SaaS Website</option>
-                      <option>Website Redesign</option>
-                      <option>AI Integration</option>
-                      <option>Business Automation</option>
-                      <option>Maintenance / Optimization</option>
-                      <option>Other</option>
+                      {projectTypes.map((projectType) => <option key={projectType}>{projectType}</option>)}
                     </select>
                     <ArrowDownRight aria-hidden="true" />
                   </div>
                   {errors.projectType && <small id="project-type-error">{errors.projectType}</small>}
                 </div>
-                <div className={`${fieldClass('budget')} form-field--full`}>
-                  <label htmlFor="budget">Budget Range <span aria-hidden="true">*</span></label>
-                  <div className="select-wrap">
-                    <select id="budget" name="budget" value={form.budget} onChange={update} aria-invalid={Boolean(errors.budget)} aria-describedby={errors.budget ? 'budget-error' : undefined}>
-                      <option value="">Select a range</option>
-                      <option>$200 or less</option>
-                      <option>$400 – $600</option>
-                      <option>$700 – $1,000</option>
-                      <option>$1,000+</option>
-                    </select>
-                    <ArrowDownRight aria-hidden="true" />
-                  </div>
-                  {errors.budget && <small id="budget-error">{errors.budget}</small>}
+                <div className={`${fieldClass('currentWebsite')} form-field--full`}>
+                  <label htmlFor="currentWebsite">Current Website <span className="field-optional">Optional</span></label>
+                  <input id="currentWebsite" name="currentWebsite" type="url" inputMode="url" value={form.currentWebsite} onChange={update} autoComplete="url" maxLength="500" placeholder="https://example.com" aria-invalid={Boolean(errors.currentWebsite)} aria-describedby={errors.currentWebsite ? 'current-website-error' : 'current-website-hint'} />
+                  <small id={errors.currentWebsite ? 'current-website-error' : 'current-website-hint'}>{errors.currentWebsite || 'Share your existing website if you have one.'}</small>
                 </div>
-                <div className={`${fieldClass('details')} form-field--full`}>
-                  <label htmlFor="details">Project Details <span aria-hidden="true">*</span></label>
-                  <textarea id="details" name="details" value={form.details} onChange={update} rows="5" placeholder="What do you need, what is not working today, and when would you like to launch?" aria-invalid={Boolean(errors.details)} aria-describedby={errors.details ? 'details-error' : 'details-hint'} />
-                  <small id={errors.details ? 'details-error' : 'details-hint'}>{errors.details || 'A few useful details are enough to start.'}</small>
+                <div className={`${fieldClass('projectDetails')} form-field--full`}>
+                  <label htmlFor="projectDetails">Project Details <span aria-hidden="true">*</span></label>
+                  <textarea id="projectDetails" name="projectDetails" value={form.projectDetails} onChange={update} rows="5" maxLength="5000" placeholder="What do you need, what is not working today, and when would you like to launch?" aria-invalid={Boolean(errors.projectDetails)} aria-describedby={errors.projectDetails ? 'project-details-error' : 'project-details-hint'} required />
+                  <small id={errors.projectDetails ? 'project-details-error' : 'project-details-hint'}>{errors.projectDetails || 'A few useful details are enough to start.'}</small>
                 </div>
                 <div className="form-honeypot" aria-hidden="true">
-                  <label htmlFor="website">Website</label>
-                  <input id="website" name="website" value={form.website} onChange={update} tabIndex="-1" autoComplete="off" />
+                  <label htmlFor="faxNumber">Fax number</label>
+                  <input id="faxNumber" name="faxNumber" value={form.faxNumber} onChange={update} tabIndex="-1" autoComplete="off" />
                 </div>
               </div>
 

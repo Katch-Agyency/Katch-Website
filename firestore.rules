@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function validStatus(status) {
+      return status in ['New', 'Contacted', 'In Discussion', 'Proposal Sent', 'Won', 'Lost', 'Archived'];
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAdmin();
+      allow create: if false;
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt'])
+        && validStatus(request.resource.data.status)
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 10000;
+      allow delete: if false;
+    }
+  }
+}

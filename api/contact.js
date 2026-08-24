@@ -1,6 +1,20 @@
+import { createProjectInquiry } from '../server/firebaseAdmin.js';
+
 const rateBuckets = new Map();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS = 5;
+const PROJECT_TYPES = new Set([
+  'Business Website',
+  'Landing Page',
+  'E-commerce',
+  'Restaurant Website',
+  'Portfolio',
+  'SaaS Website',
+  'Website Redesign',
+  'AI Integration',
+  'Automation',
+  'Other',
+]);
 
 function escapeHtml(value = '') {
   return String(value)
@@ -17,6 +31,20 @@ function clean(value, maxLength) {
 
 function isValidEmail(email) {
   return /^\S+@\S+\.\S+$/.test(email) && email.length <= 254;
+}
+
+function isValidWebsite(value) {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && url.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
+function isValidSubmissionId(value) {
+  return /^[A-Za-z0-9_-]{16,100}$/.test(value);
 }
 
 function isRateLimited(request) {
@@ -37,70 +65,15 @@ function originIsAllowed(request) {
   return !origin || allowed.includes(origin);
 }
 
-export default async function handler(request, response) {
-  response.setHeader('Cache-Control', 'no-store');
-  response.setHeader('Content-Type', 'application/json; charset=utf-8');
-
-  if (request.method !== 'POST') {
-    response.setHeader('Allow', 'POST');
-    return response.status(405).json({ message: 'Method not allowed.' });
-  }
-
-  if (!originIsAllowed(request)) {
-    return response.status(403).json({ message: 'Request origin is not allowed.' });
-  }
-
-  const contentLength = Number(request.headers['content-length'] || 0);
-  if (contentLength > 20_000) {
-    return response.status(413).json({ message: 'Request is too large.' });
-  }
-
-  if (isRateLimited(request)) {
-    return response.status(429).json({ message: 'Too many requests. Please wait a few minutes and try again.' });
-  }
-
-  let body = request.body || {};
-  if (typeof body === 'string') {
-    try {
-      body = JSON.parse(body);
-    } catch {
-      return response.status(400).json({ message: 'Invalid request.' });
-    }
-  }
-
-  // Bots commonly fill this hidden field. Respond successfully without sending.
-  if (body.website) return response.status(200).json({ ok: true });
-
-  const submission = {
-    name: clean(body.name, 100),
-    email: clean(body.email, 254),
-    company: clean(body.company, 140),
-    projectType: clean(body.projectType, 100),
-    budget: clean(body.budget, 100),
-    details: clean(body.details, 5000),
-    submittedAt: clean(body.submittedAt, 80),
-  };
-
-  if (
-    submission.name.length < 2 ||
-    !isValidEmail(submission.email) ||
-    !submission.projectType ||
-    !submission.budget ||
-    submission.details.length < 20
-  ) {
-    return response.status(422).json({ message: 'Please complete all required fields with valid information.' });
-  }
-
+async function sendOptionalNotification(inquiry, submissionId) {
   const apiKey = process.env.RESEND_API_KEY;
   const contactEmail = process.env.KATCH_CONTACT_EMAIL;
   const fromEmail = process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !contactEmail || !fromEmail) return;
 
-  if (!apiKey || !contactEmail || !fromEmail) {
-    console.error('Contact form environment variables are not configured.');
-    return response.status(503).json({ message: 'Project requests are temporarily unavailable. Please try again shortly.' });
-  }
-
-  const safe = Object.fromEntries(Object.entries(submission).map(([key, value]) => [key, escapeHtml(value)]));
+  const safe = Object.fromEntries(Object.entries(inquiry).map(([key, value]) => [key, escapeHtml(value)]));
+  const publicSiteUrl = clean(process.env.PUBLIC_SITE_URL, 300).replace(/\/$/, '');
+  const projectUrl = publicSiteUrl ? `${publicSiteUrl}/admin/projects/${encodeURIComponent(submissionId)}` : '';
   const emailResponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -110,19 +83,18 @@ export default async function handler(request, response) {
     body: JSON.stringify({
       from: fromEmail,
       to: [contactEmail],
-      reply_to: submission.email,
-      subject: `New Katch project request — ${submission.projectType}`,
+      reply_to: inquiry.email,
+      subject: `New Katch project request — ${inquiry.projectType}`,
       text: [
-        `Name: ${submission.name}`,
-        `Email: ${submission.email}`,
-        `Company: ${submission.company || 'Not provided'}`,
-        `Project type: ${submission.projectType}`,
-        `Budget: ${submission.budget}`,
+        `Name: ${inquiry.name}`,
+        `Email: ${inquiry.email}`,
+        `Company: ${inquiry.company}`,
+        `Project type: ${inquiry.projectType}`,
+        `Current website: ${inquiry.currentWebsite || 'Not provided'}`,
         '',
         'Project details:',
-        submission.details,
-        '',
-        `Submitted: ${submission.submittedAt || new Date().toISOString()}`,
+        inquiry.projectDetails,
+        ...(projectUrl ? ['', `View project: ${projectUrl}`] : []),
       ].join('\n'),
       html: `
         <div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#11110f">
@@ -131,21 +103,76 @@ export default async function handler(request, response) {
           <table style="width:100%;border-collapse:collapse;margin:28px 0">
             <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Name</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.name}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Email</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.email}</td></tr>
-            <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Company</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.company || 'Not provided'}</td></tr>
-            <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Budget</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.budget}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Company</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.company}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #ddd;color:#666">Current website</td><td style="padding:10px 0;border-bottom:1px solid #ddd">${safe.currentWebsite || 'Not provided'}</td></tr>
           </table>
           <h2 style="font-size:18px">Project details</h2>
-          <p style="line-height:1.7;white-space:pre-wrap">${safe.details}</p>
+          <p style="line-height:1.7;white-space:pre-wrap">${safe.projectDetails}</p>
+          ${projectUrl ? `<p style="margin-top:28px"><a href="${escapeHtml(projectUrl)}" style="display:inline-block;padding:12px 18px;background:#11110f;color:#fff;text-decoration:none">View project</a></p>` : ''}
         </div>
       `,
     }),
   });
 
-  if (!emailResponse.ok) {
-    const providerError = await emailResponse.text();
-    console.error('Resend request failed:', emailResponse.status, providerError);
-    return response.status(502).json({ message: 'We could not send your request. Please try again in a moment.' });
+  if (!emailResponse.ok) console.error('Resend notification failed:', emailResponse.status);
+}
+
+export default async function handler(request, response) {
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  if (request.method !== 'POST') {
+    response.setHeader('Allow', 'POST');
+    return response.status(405).json({ message: 'Method not allowed.' });
+  }
+  if (!originIsAllowed(request)) return response.status(403).json({ message: 'Unable to submit this request.' });
+  if (Number(request.headers['content-length'] || 0) > 20_000) return response.status(413).json({ message: 'Unable to submit this request.' });
+  if (isRateLimited(request)) return response.status(429).json({ message: 'Please wait a few minutes before trying again.' });
+
+  let body = request.body || {};
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      return response.status(400).json({ message: 'Unable to submit this request.' });
+    }
   }
 
-  return response.status(200).json({ ok: true });
+  // Bots commonly fill this hidden field. Return success without storing data.
+  if (body.faxNumber) return response.status(200).json({ ok: true });
+
+  const submissionId = clean(body.submissionId, 100);
+  const inquiry = {
+    name: clean(body.name, 100),
+    email: clean(body.email, 254).toLowerCase(),
+    company: clean(body.company, 160),
+    projectType: clean(body.projectType, 100),
+    projectDetails: clean(body.projectDetails, 5000),
+    currentWebsite: clean(body.currentWebsite, 500),
+  };
+
+  const valid = isValidSubmissionId(submissionId)
+    && inquiry.name.length >= 2
+    && isValidEmail(inquiry.email)
+    && inquiry.company.length >= 2
+    && PROJECT_TYPES.has(inquiry.projectType)
+    && inquiry.projectDetails.length >= 20
+    && isValidWebsite(inquiry.currentWebsite);
+
+  if (!valid) return response.status(422).json({ message: 'Please check the required fields and try again.' });
+
+  try {
+    const result = await createProjectInquiry(submissionId, inquiry);
+    if (!result.duplicate) {
+      try {
+        await sendOptionalNotification(inquiry, submissionId);
+      } catch (error) {
+        console.error('Project notification could not be sent:', error instanceof Error ? error.message : 'unknown_error');
+      }
+    }
+    return response.status(200).json({ ok: true });
+  } catch (error) {
+    console.error('Project inquiry submission failed:', error instanceof Error ? error.message : 'unknown_error');
+    return response.status(503).json({ message: 'Project requests are temporarily unavailable. Please try again shortly.' });
+  }
 }

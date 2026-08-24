@@ -8,10 +8,13 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "qa": "node scripts/production-qa.mjs",
+    "qa:admin": "npx --yes firebase-tools@13.31.2 emulators:exec --only auth,firestore --project demo-katch \"node scripts/admin-integration-qa.mjs\"",
+    "admin:grant": "node scripts/set-admin-claim.mjs",
     "lint": "eslint .",
     "audit:production": "npm run lint && npm run build"
   },
   "dependencies": {
+    "firebase": "^12.18.0",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -23,6 +26,7 @@
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
+    "firebase-admin": "^13.10.0",
     "globals": "latest",
     "playwright": "latest",
     "vite": "^8.2.1"

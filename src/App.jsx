@@ -10,6 +10,7 @@ const ProcessPage = lazy(() => import('./pages/ProcessPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AdminApp = lazy(() => import('./admin/AdminApp'));
 
 function RouteLoading() {
   return <div className="route-loading" aria-label="Loading page" />;
@@ -20,6 +21,7 @@ export default function App() {
     <BrowserRouter>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
+          <Route path="admin/*" element={<AdminApp />} />
           <Route element={<SiteLayout />}>
             <Route index element={<HomePage />} />
             <Route path="demos" element={<DemosPage />} />
