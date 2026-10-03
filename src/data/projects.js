@@ -113,12 +113,12 @@ export const projects = [
   {
     id: 'refined-artistry',
     number: '04',
-    name: 'Refined Artistry',
-    category: 'Watch & Accessories',
+    name: 'Meridian',
+    category: 'Watches & Accessories',
     image: '/projects/refined-preview.webp',
     imageSmall: '/projects/refined-preview-sm.webp',
     imageXSmall: '/projects/refined-preview-xs.webp',
-    imageAlt: 'Refined Artistry watch storefront with a dark editorial layout and close-up premium watch photography',
+    imageAlt: 'Meridian watch storefront with a dark editorial layout and close-up premium watch photography',
     url: 'https://refined-artistry-platform.lovable.app/',
     description:
       'A refined e-commerce experience designed for premium watches and accessories, combining elegant presentation, product-focused layouts, and a sophisticated visual identity.',
