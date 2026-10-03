@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { SiteLayout } from './components/SiteLayout';
 import HomePage from './pages/HomePage';
 
@@ -16,6 +16,11 @@ function RouteLoading() {
   return <div className="route-loading" aria-label="Loading page" />;
 }
 
+function LegacyWorkRedirect() {
+  const { projectId } = useParams();
+  return <Navigate to={projectId ? `/demos/${projectId}` : '/demos'} replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -26,6 +31,9 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="demos" element={<DemosPage />} />
             <Route path="demos/:projectId" element={<DemoDetailsPage />} />
+            {/* Keep the earlier portfolio URLs working without maintaining a second page tree. */}
+            <Route path="work" element={<LegacyWorkRedirect />} />
+            <Route path="work/:projectId" element={<LegacyWorkRedirect />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="process" element={<ProcessPage />} />
             <Route path="about" element={<AboutPage />} />

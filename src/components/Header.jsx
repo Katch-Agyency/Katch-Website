@@ -34,6 +34,16 @@ export function Header() {
   }, []);
 
   useEffect(() => {
+    const closeOnHistoryNavigation = () => {
+      returnFocusRef.current = false;
+      restoreScrollRef.current = false;
+      setMenuOpen(false);
+    };
+    window.addEventListener('popstate', closeOnHistoryNavigation);
+    return () => window.removeEventListener('popstate', closeOnHistoryNavigation);
+  }, []);
+
+  useEffect(() => {
     if (!menuOpen) return undefined;
 
     const body = document.body;
@@ -96,7 +106,7 @@ export function Header() {
       if (restoreScrollRef.current) {
         delete body.dataset.lockedScroll;
         const top = scrollPositionRef.current;
-        window.requestAnimationFrame(() => window.scrollTo({ top, left: 0, behavior: 'instant' }));
+        window.requestAnimationFrame(() => window.scrollTo({ top, left: 0, behavior: 'auto' }));
       } else {
         window.requestAnimationFrame(() => delete body.dataset.lockedScroll);
       }

@@ -32,10 +32,20 @@ const caseRoutes = [
   '/demos/raw',
   '/demos/refined-artistry',
 ];
-const widths = [320, 360, 375, 390, 414, 768, 820, 1024, 1280, 1440, 1920];
+const viewports = [
+  [320, 700],
+  [360, 800],
+  [375, 812],
+  [390, 844],
+  [414, 896],
+  [768, 1024],
+  [1024, 768],
+  [1280, 800],
+  [1440, 900],
+  [1920, 1080],
+];
 
-for (const width of widths) {
-  const height = width <= 414 ? 844 : width <= 820 ? 1024 : 960;
+for (const [width, height] of viewports) {
   for (const route of primaryRoutes) {
     const { page, errors } = await openPage(route, { width, height });
     const result = await page.evaluate(() => ({
@@ -52,7 +62,7 @@ for (const width of widths) {
     check(errors.length === 0, `${width}px ${route}: ${errors.join(' | ')}`);
     await page.close();
   }
-  notes.push(`Responsive routes passed at ${width}px`);
+  notes.push(`Responsive routes passed at ${width}×${height}`);
 }
 
 for (const route of [...caseRoutes, '/404', '/not-a-real-page']) {
@@ -73,6 +83,23 @@ for (const route of [...caseRoutes, '/404', '/not-a-real-page']) {
   }
 }
 notes.push('Demo details, 404, and direct refresh checks passed');
+
+// Portfolio links are deliberate external destinations and should not silently drift.
+{
+  const expectedProjectUrls = [
+    'https://smash-burger-co-phi.vercel.app/',
+    'https://bta3-7awa4y-demo.vercel.app/',
+    'https://raw-clothing-brand.vercel.app/',
+    'https://refined-artistry-platform.lovable.app/',
+  ];
+  const { page, errors } = await openPage('/demos', { width: 1440, height: 900 });
+  const liveLinks = await page.locator('.project-links a[target="_blank"]').evaluateAll((elements) => elements.map((element) => element.href));
+  check(expectedProjectUrls.every((url) => liveLinks.includes(url)), `Portfolio links changed: ${liveLinks.join(', ')}`);
+  check(liveLinks.length === expectedProjectUrls.length, `Expected ${expectedProjectUrls.length} portfolio links, found ${liveLinks.length}`);
+  check(errors.length === 0, `Portfolio link page errors: ${errors.join(' | ')}`);
+  await page.close();
+}
+notes.push('Portfolio destinations passed');
 
 // Admin routes must remain protected and responsive even before Firebase is configured.
 for (const width of [320, 375, 390, 414, 768, 1024, 1280]) {

@@ -1,9 +1,15 @@
 {
+  "redirects": [
+    { "source": "/work", "destination": "/demos", "permanent": true },
+    { "source": "/work/:path*", "destination": "/demos/:path*", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/admin/:path*", "destination": "/index.html" },
     { "source": "/demos", "destination": "/index.html" },
     { "source": "/demos/:path*", "destination": "/index.html" },
+    { "source": "/work", "destination": "/index.html" },
+    { "source": "/work/:path*", "destination": "/index.html" },
     { "source": "/services", "destination": "/index.html" },
     { "source": "/process", "destination": "/index.html" },
     { "source": "/about", "destination": "/index.html" },
@@ -17,6 +23,10 @@
     },
     {
       "source": "/admin/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
+    },
+    {
+      "source": "/404",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" }]
     },
     {

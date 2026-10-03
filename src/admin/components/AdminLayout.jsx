@@ -86,10 +86,14 @@ export function AdminLayout() {
         </button>
       </header>
 
-      <div className={`admin-drawer-layer ${mobileOpen ? 'admin-drawer-layer--open' : ''}`} onMouseDown={(event) => {
-        if (event.target === event.currentTarget) setMobileOpen(false);
-      }}>
-        <aside ref={drawerRef} className="admin-drawer" aria-label="Mobile admin navigation">
+      <div
+        className={`admin-drawer-layer ${mobileOpen ? 'admin-drawer-layer--open' : ''}`}
+        aria-hidden={!mobileOpen}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setMobileOpen(false);
+        }}
+      >
+        <aside ref={drawerRef} className="admin-drawer" role="dialog" aria-modal={mobileOpen ? 'true' : undefined} aria-label="Mobile admin navigation">
           <button ref={closeButtonRef} className="admin-drawer-close" type="button" aria-label="Close admin navigation" onClick={() => setMobileOpen(false)}>
             <X aria-hidden="true" />
           </button>

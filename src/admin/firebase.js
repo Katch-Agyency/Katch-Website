@@ -23,7 +23,7 @@ export function getFirebaseServices() {
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
-  setPersistence(auth, browserLocalPersistence).catch(() => undefined);
+  const persistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => undefined);
 
   if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true' && !emulatorsConnected) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
@@ -31,6 +31,6 @@ export function getFirebaseServices() {
     emulatorsConnected = true;
   }
 
-  services = { app, auth, db };
+  services = { app, auth, db, persistenceReady };
   return services;
 }

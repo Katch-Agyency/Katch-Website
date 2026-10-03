@@ -314,7 +314,7 @@ ol {
 }
 
 .site-header:not(.site-header--scrolled) .brand-logo,
-.site-header:has(.mobile-menu--open) .brand-logo {
+.site-header:has(+ .mobile-nav-layer--open) .brand-logo {
   filter: invert(1);
 }
 
@@ -2635,7 +2635,7 @@ ol {
     display: grid;
   }
 
-  .site-header:has(.mobile-menu--open) {
+  .site-header:has(+ .mobile-nav-layer--open) {
     color: var(--white);
     border-color: var(--line-light);
     background: var(--ink);

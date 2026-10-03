@@ -46,6 +46,7 @@ export function AdminAuthProvider({ children }) {
     ...state,
     async login(email, password) {
       if (!firebase.auth) throw new Error('firebase_client_not_configured');
+      await firebase.persistenceReady;
       const credential = await signInWithEmailAndPassword(firebase.auth, email, password);
       const token = await credential.user.getIdTokenResult(true);
       if (token.claims.admin !== true) {
@@ -57,7 +58,7 @@ export function AdminAuthProvider({ children }) {
     async logout() {
       if (firebase.auth) await signOut(firebase.auth);
     },
-  }), [firebase.auth, state]);
+  }), [firebase.auth, firebase.persistenceReady, state]);
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
 }

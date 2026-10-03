@@ -108,6 +108,8 @@ export function ContactForm() {
     }
 
     setStatus('submitting');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20_000);
     try {
       const endpoint = import.meta.env.VITE_CONTACT_ENDPOINT || '/api/contact';
       const payload = {
@@ -124,15 +126,21 @@ export function ContactForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || 'submission_failed');
+      // Vite serves an unknown /api path as the app during local development. Do not
+      // show a false success state unless the configured boundary explicitly confirms it.
+      if (!response.ok || data.ok !== true) throw new Error(data.message || 'submission_failed');
       setStatus('success');
+      setErrors({});
       setForm(initialForm);
       submissionIdRef.current = createSubmissionId();
     } catch {
       setStatus('error');
       setServerMessage('We couldn’t send your request right now. Please try again in a moment.');
+    } finally {
+      window.clearTimeout(timeout);
     }
   };
 
@@ -162,7 +170,11 @@ export function ContactForm() {
               <p className="eyebrow">Request received</p>
               <h2>Project request received. We&apos;ll get back to you soon.</h2>
               <p>Your details have been sent securely to Katch.</p>
-              <button type="button" onClick={() => setStatus('idle')}>
+              <button type="button" onClick={() => {
+                setStatus('idle');
+                setErrors({});
+                setServerMessage('');
+              }}>
                 Send another request <ArrowDownRight aria-hidden="true" />
               </button>
             </div>
@@ -193,7 +205,7 @@ export function ContactForm() {
                     </select>
                     <ArrowDownRight aria-hidden="true" />
                   </div>
-                  {errors.projectType && <small id="project-type-error">{errors.projectType}</small>}
+                  {errors.projectType && <small id="project-type-error" role="alert">{errors.projectType}</small>}
                 </div>
                 <div className={`${fieldClass('currentWebsite')} form-field--full`}>
                   <label htmlFor="currentWebsite">Current Website <span className="field-optional">Optional</span></label>

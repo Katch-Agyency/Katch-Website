@@ -1,1 +1,3 @@
+/work  /demos  301
+/work/*  /demos/:splat  301
 /*  /index.html  200

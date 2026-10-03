@@ -23,6 +23,7 @@ export default function DemoDetailsPage() {
         description={project.description}
         path={path}
         image={`https://katch.agency${project.image}`}
+        imageAlt={project.imageAlt}
         type="article"
       />
 
@@ -36,7 +37,7 @@ export default function DemoDetailsPage() {
             <div className="case-overview">
               <p>{project.description}</p>
               <a href={project.url} target="_blank" rel="noopener noreferrer">
-                View Live Demo <ExternalLink aria-hidden="true" size={16} />
+                View Live Website <ExternalLink aria-hidden="true" size={16} />
               </a>
             </div>
           </div>
@@ -128,13 +129,13 @@ export default function DemoDetailsPage() {
           <p className="case-section-label">06 / Final result</p>
           <h2>{project.result}</h2>
           <a href={project.url} target="_blank" rel="noopener noreferrer">
-            View Live Demo <ArrowUpRight aria-hidden="true" />
+            View Live Website <ArrowUpRight aria-hidden="true" />
           </a>
         </section>
 
         <div className="case-next reveal">
           <div>
-            <p>Next demo</p>
+            <p>Next project</p>
             <strong>{nextProject.name}</strong>
           </div>
           <Link to={`/demos/${nextProject.id}`}>

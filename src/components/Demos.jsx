@@ -21,7 +21,7 @@ function ProjectCard({ project, layout, priority = false }) {
             decoding="async"
           />
           <span className="visual-action" aria-hidden="true">
-            View Demo Details <ArrowUpRight size={16} />
+            View Case Study <ArrowUpRight size={16} />
           </span>
         </Link>
         <span className="project-number" aria-hidden="true">{project.number}</span>
@@ -38,10 +38,10 @@ function ProjectCard({ project, layout, priority = false }) {
           </ul>
           <div className="project-links">
             <Link className="case-link" to={casePath}>
-              View Demo Details <ArrowUpRight size={15} aria-hidden="true" />
+              View Case Study <ArrowUpRight size={15} aria-hidden="true" />
             </Link>
             <a href={project.url} target="_blank" rel="noopener noreferrer">
-              View Live Demo <ExternalLink size={14} aria-hidden="true" />
+              View Live Website <ExternalLink size={14} aria-hidden="true" />
             </a>
           </div>
         </div>

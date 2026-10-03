@@ -27,7 +27,7 @@ export default function AdminProjectsPage() {
 
   const filteredProjects = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return projects
+    return [...projects]
       .filter((project) => !term || [project.name, project.company, project.email].some((value) => value.toLowerCase().includes(term)))
       .filter((project) => status === 'All' || project.status === status)
       .filter((project) => projectType === 'All' || project.projectType === projectType)

@@ -20,6 +20,9 @@
     "react-dom": "latest",
     "react-router-dom": "^7.18.2"
   },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
+  },
   "devDependencies": {
     "@eslint/js": "latest",
     "@vitejs/plugin-react": "^6.0.5",

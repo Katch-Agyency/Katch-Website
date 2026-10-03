@@ -58,11 +58,20 @@ function isRateLimited(request) {
 }
 
 function originIsAllowed(request) {
-  const configured = process.env.ALLOWED_ORIGINS;
-  if (!configured) return true;
-  const allowed = configured.split(',').map((origin) => origin.trim()).filter(Boolean);
+  const configured = process.env.ALLOWED_ORIGINS || process.env.PUBLIC_SITE_URL;
   const origin = request.headers.origin;
-  return !origin || allowed.includes(origin);
+
+  // Server-to-server requests do not carry an Origin header. Browser requests in
+  // production must match an explicitly configured public origin; local QA stays
+  // usable when no deployment origin has been configured yet.
+  if (!origin) return true;
+  if (configured) {
+    const allowed = configured.split(',').map((value) => value.trim().replace(/\/$/, '')).filter(Boolean);
+    return allowed.includes(origin.replace(/\/$/, ''));
+  }
+
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  return !isProduction;
 }
 
 async function sendOptionalNotification(inquiry, submissionId) {
@@ -136,6 +145,9 @@ export default async function handler(request, response) {
     } catch {
       return response.status(400).json({ message: 'Unable to submit this request.' });
     }
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return response.status(400).json({ message: 'Unable to submit this request.' });
   }
 
   // Bots commonly fill this hidden field. Return success without storing data.

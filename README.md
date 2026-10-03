@@ -29,6 +29,7 @@ The public browser never receives service-account credentials and cannot read or
 - `/demos/bta3-7awa4y`
 - `/demos/raw`
 - `/demos/refined-artistry`
+- `/work` and `/work/:projectId` (legacy portfolio aliases that redirect to the `/demos` routes)
 - `/services`
 - `/process`
 - `/about`

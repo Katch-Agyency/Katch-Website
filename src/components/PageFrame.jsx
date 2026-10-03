@@ -17,7 +17,7 @@ export function PageFrame({ children, className = '' }) {
           return;
         }
         const top = navigationType === 'POP' ? readScrollPosition(key) : 0;
-        window.scrollTo({ top, left: 0, behavior: 'instant' });
+        window.scrollTo({ top, left: 0, behavior: 'auto' });
       });
     });
 
